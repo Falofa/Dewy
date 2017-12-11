@@ -21,9 +21,19 @@ namespace Dewy
         {
             Parameters[Name.ToLower()] = Default;
         }
+        public void AddParameter(IEnumerable<string> Names)
+        {
+            foreach (string Name in Names)
+                Parameters[Name.ToLower()] = "";
+        }
         public void AddSwitch(string Name)
         {
             Switches[Name.ToLower()] = false;
+        }
+        public void AddSwitch(IEnumerable<string> Names)
+        {
+            foreach (string Name in Names)
+                Switches[Name.ToLower()] = false;
         }
         public bool Switch(string Name)
         {
@@ -43,8 +53,6 @@ namespace Dewy
         }
         public bool ParsePR = true;
         public bool ParseSW = true;
-
-        //public bool Basic = false;
         public string Get(int i, string Default = "")
         {
             if (i >= Arguments.Count)

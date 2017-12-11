@@ -22,12 +22,8 @@ namespace Dewy
                 .Make("ls")
                 .SetFunc((a) =>
                 {
-                    string[] Files = new string[0];
                     Terminal.WriteLine("{0} {1}", a.Switch("f"), a.Switch("d"));
-                    if (a.Switch("d") || !a.Switch("f"))
-                        Files = Files.ToList<string>().Concat(Directory.GetDirectories(Environment.CurrentDirectory)).ToArray();
-                    if (a.Switch("f") || !a.Switch("d"))
-                        Files = Files.ToList<string>().Concat(Directory.GetFiles(Environment.CurrentDirectory)).ToArray();
+                    string[] Files = Util.FetchFiles(a.Get(1), a);
                     foreach (string F in Files)
                     {
                         FileInfo f = new FileInfo(F);
@@ -42,7 +38,7 @@ namespace Dewy
                         Terminal.CWriteLine("$f[$a{0}$f] $a{1}", Attr, f.Name);
                     }
                 })
-                .AddSwitch(Util.List("d", "f"));
+                .Switch(Util.FetchFilesParam);
             #endregion
             #region CD
             Command

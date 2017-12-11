@@ -43,8 +43,8 @@ namespace Dewy
                 return;
             }
             p = new Parser();
-            p.Switches = ToRun.Switches;
-            p.Parameters = ToRun.Parameters;
+            p.Switches = new Dictionary<string, bool>(ToRun.Switches);
+            p.Parameters = new Dictionary<string, string>(ToRun.Parameters);
             p.Parse(Command);
             ToRun.Callback.Invoke(p);
             p.Get(0);

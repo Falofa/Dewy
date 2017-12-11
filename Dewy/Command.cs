@@ -31,12 +31,12 @@ namespace Dewy
             Aliases.Add(Name.ToLower());
             return this;
         }
-        public Command AddParam(string Name, string Default = "")
+        public Command Param(string Name, string Default = "")
         {
             Parameters[Name] = Default;
             return this;
         }
-        public Command AddParam(IEnumerable<string> Names)
+        public Command Param(IEnumerable<string> Names)
         {
             foreach (string Name in Names)
             {
@@ -44,12 +44,28 @@ namespace Dewy
             }
             return this;
         }
-        public Command AddSwitch(string Name)
+        public Command Params(params string[] Names)
+        {
+            foreach (string Name in Names)
+            {
+                Parameters[Name] = "";
+            }
+            return this;
+        }
+        public Command Switch(string Name)
         {
             Switches[Name] = false;
             return this;
         }
-        public Command AddSwitch(IEnumerable<string> Names)
+        public Command Switch(IEnumerable<string> Names)
+        {
+            foreach (string Name in Names)
+            {
+                Switches[Name] = false;
+            }
+            return this;
+        }
+        public Command Switch(params string[] Names)
         {
             foreach (string Name in Names)
             {
