@@ -10,9 +10,11 @@ namespace Dewy
         public string Name = null;
         public Dictionary<string, string> Parameters = new Dictionary<string, string>();
         public Dictionary<string, bool> Switches = new Dictionary<string, bool>();
+        public Dictionary<string, string> HParameters = new Dictionary<string, string>();
+        public Dictionary<string, string> HSwitches = new Dictionary<string, string>();
         public List<string> Aliases = new List<string>();
         public Action<Parser> Callback = null;
-        public string Description = "";
+        public string Description = "Nothing here";
         public bool ParsePR = true;
         public bool ParseSW = true;
 
@@ -26,9 +28,43 @@ namespace Dewy
         {
             return new Command(Name);
         }
-        public Command Alias(string Name)
+        public Command Describe(string Text)
         {
-            Aliases.Add(Name.ToLower());
+            Description = Text.TrimEnd('.');
+            return this;
+        }
+        public Command DescribeParam(string Key, string Text)
+        {
+            HParameters[Key] = Text.TrimEnd('.');
+            return this;
+        }
+        public Command DescribeSwitch(string Key, string Text)
+        {
+            HSwitches[Key] = Text.TrimEnd('.');
+            return this;
+        }
+        public Command DescribeParams(Dictionary<string, string> Help)
+        {
+            foreach (KeyValuePair<string, string> H in Help)
+                HParameters[H.Key] = H.Value.TrimEnd('.');
+            return this;
+        }
+        public Command DescribeSwitches(Dictionary<string, string> Help)
+        {
+            foreach (KeyValuePair<string, string> H in Help)
+                HSwitches[H.Key] = H.Value.TrimEnd('.');
+            return this;
+        }
+        public Command Alias(params string[] Names)
+        {
+            foreach(string Name in Names)
+                Aliases.Add(Name.ToLower());
+            return this;
+        }
+        public Command Alias(IEnumerable<string> Names)
+        {
+            foreach (string Name in Names)
+                Aliases.Add(Name.ToLower());
             return this;
         }
         public Command Param(string Name, string Default = "")
@@ -73,14 +109,9 @@ namespace Dewy
             }
             return this;
         }
-        public Command SetFunc( Action<Parser> Fun )
+        public Command SetFunc(Action<Parser> Fun)
         {
             Callback = Fun;
-            return this;
-        }
-        public Command Desc(string Text)
-        {
-            Description = Text;
             return this;
         }
         public Command ParseParameters(bool Parse)
@@ -99,11 +130,32 @@ namespace Dewy
             ParseSW = !Parse;
             return this;
         }
-        /*public Command Save()
+        public Command Preset(CommandPreset Preset)
         {
-            if (!Program.Cmds.Contains(this))
-                Program.Cmds.Add(this);
+            foreach(KeyValuePair<string, string> Pr in Preset.Parameters)
+                this.Params(Pr.Key, Pr.Value);
+            foreach (string Sw in Preset.Switches)
+                this.Switch(Sw);
+            this.DescribeParams(Preset.HParameters);
+            this.DescribeSwitches(Preset.HSwitches);
+            foreach (CommandPreset p in Preset.Required)
+            {
+                if (p == Preset) continue;
+                this.Preset(p);
+            }
             return this;
-        }*/
+        }
+    }
+    class CommandPreset
+    {
+        public Dictionary<string, string> Parameters = new Dictionary<string, string>();
+        public List<string> Switches = new List<string>();
+        public Dictionary<string, string> HParameters = new Dictionary<string, string>();
+        public Dictionary<string, string> HSwitches = new Dictionary<string, string>();
+        public CommandPreset[] Required = null;
+        public CommandPreset(params CommandPreset[] Presets)
+        {
+            this.Required = Presets;
+        }
     }
 }

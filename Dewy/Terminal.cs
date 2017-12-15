@@ -35,6 +35,7 @@ namespace Dewy
             ColorRegex = new Regex("(?<!\\\\)\\$[a-fr\\d]", Program.GeneralUseRegex);
             Console.Title = Program.Name;
             Console.BufferHeight = Console.WindowHeight;
+            Fingerprint();
             ResetColors();
         }
         public static void BufferUpdate()
@@ -47,6 +48,32 @@ namespace Dewy
 
         public static ConsoleColor DefaultForeground = ConsoleColor.White;
         public static ConsoleColor DefaultBackground = ConsoleColor.Black;
+        public static void SetForeColor(ConsoleColor c)
+        {
+            Console.ForegroundColor = c;
+        }
+        public static void SetForeColor(char c)
+        {
+            char b = c.ToString().ToLower()[0];
+            if (b == 'r')
+                Console.ForegroundColor = DefaultForeground;
+            if (!Colors.ContainsKey(c))
+                return;
+            Console.ForegroundColor = Colors[b];
+        }
+        public static void SetBackColor(ConsoleColor c)
+        {
+            Console.BackgroundColor = c;
+        }
+        public static void SetBackColor(char c)
+        {
+            char b = c.ToString().ToLower()[0];
+            if (b == 'r')
+                Console.BackgroundColor = DefaultBackground;
+            if (!Colors.ContainsKey(c))
+                return;
+            Console.BackgroundColor = Colors[b];
+        }
         public static void ResetColors()
         {
             Console.BackgroundColor = DefaultBackground;
@@ -70,6 +97,26 @@ namespace Dewy
                 if (i++ > 0) Console.WriteLine();
                 BufferUpdate();
             }
+        }
+
+        public static void Fingerprint()
+        {
+            string[] Mark = new string[] {
+                @"  $a╔$a══════════════════════════════$a╗",
+                @"  $a║$c  _____                       $a║",
+                @"  $a║$c |  __ \                      $a║",
+                @"  $a║$c | |  | | _____      ___   _  $a║",
+                @"  $a║$c | |  | |/ _ \ \ /\ / / | | | $a║",
+                @"  $a║$c | |__| |  __/\ V  V /| |_| | $a║",
+                @"  $a║$c |_____/ \___| \_/\_/  \__, | $a║",
+                @"  $a║$c                        __/ | $a║",
+                @"  $a║$c  $fDeveloped by Falofa  $c|___/  $a║",
+                @"  $a╚$a══════════════════════════════$a╝"
+            };
+            WriteLine();
+            foreach (string Line in Mark)
+                CWriteLine(Line);
+            WriteLine();
         }
 
         public static void WriteLine(string Format = "", params object[] Args)
@@ -130,6 +177,10 @@ namespace Dewy
                 WriteLine();
             Write("> ");
             return ReadLine();
+        }
+        public static void Clear()
+        {
+            Console.Clear();
         }
     }
 }

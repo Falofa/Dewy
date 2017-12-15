@@ -4,11 +4,33 @@ using System.Linq;
 using System.Text;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Security;
+using System.Security.Principal;
 
 namespace Dewy
 {
     class Util
     {
+        public static string DewyPath()
+        {
+            FileInfo Self = new FileInfo(Environment.GetCommandLineArgs()[0]);
+            return Path.Combine(Self.Directory.FullName, Self.Name.Replace(".vshost", ""));
+        }
+        public static bool IsAdmin()
+        {
+            using (WindowsIdentity Identity = WindowsIdentity.GetCurrent())
+            {
+                WindowsPrincipal Principal = new WindowsPrincipal(Identity);
+                return Principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+        public static string UserName()
+        {
+            using (WindowsIdentity Identity = WindowsIdentity.GetCurrent())
+            {
+                return Identity.Name;
+            }
+        }
         public static List<T> List<T>(params T[] List)
         {
             return List.ToList<T>();
@@ -47,24 +69,47 @@ namespace Dewy
             }
             return null;
         }
+        public static FileInfo FindFile(string Input)
+        {
+            string In = Input.ToLower();
+            Regex WideSearch = new Regex("^" + Regex.Escape(In.TrimEnd('.')) + "\\.[^.]+$", Program.GeneralUseRegex);
+            HashSet<string> Search = new HashSet<string>();
+            Search.Add(Environment.CurrentDirectory);
+            string[] Dirs = Environment.GetEnvironmentVariable("path").Split(';');
+            foreach (string Dir in Dirs)
+                Search.Add(Dir);
+            foreach(string Dir in Search)
+            {
+                try
+                {
+                    string[] Files = Directory.GetFiles(Dir);
+                    foreach (string Fi in Files)
+                    {
+                        FileInfo f = new FileInfo(Fi);
+                        if (f.Name.ToLower() == In) return f;
+                        if (WideSearch.IsMatch(f.Name.ToLower())) return f;
+                    }
+                } catch(Exception) { }
+            }
+            return null;
+        }
         public static string PrettyDir(string Dir)
         {
             if (Dir.Length < 2) return Dir.ToUpper();
             return Dir.Substring(0, 1).ToUpper() + Dir.Substring(1);
         }
-        public static string[] FetchFilesParam = Array("r", "f", "d");
-        public static string ArrayToStr(IEnumerable<string> Arr)
+        public static string ArrayToStr(IEnumerable<string> Arr, string Separator = "\n")
         {
-            return string.Join("\n", Arr.ToArray());
+            return string.Join(Separator, Arr.ToArray());
         }
-        public static string DictToStr<T,R>(Dictionary<T, R> Arr)
+        public static string DictToStr<T,R>(Dictionary<T, R> Arr, string Separator = "\n")
         {
             string Result = "";
             foreach(KeyValuePair<T, R> K in Arr)
             {
-                Result += string.Format("{0} = {1}\n", K.Key, K.Value);
+                Result += string.Format("{0} = {1}{2}", K.Key, K.Value, Separator);
             }
-            return Result.TrimEnd('\n');
+            return Regex.Replace(Result, Regex.Escape(Separator) + "$", "");
         }
         public static bool IsDir(string s)
         {
@@ -90,7 +135,6 @@ namespace Dewy
             }
             return Result.ToArray();
         }
-        public static string[] RegexParam = Array("r");
         public static Regex GenericRegex(string Input, Parser a)
         {
             Regex m = null;
@@ -101,7 +145,7 @@ namespace Dewy
             else
             {
                 if (Input.Length == 0) return new Regex(".+");
-                m = new Regex("^" + Regex.Escape(Input).Replace("\\*", "(.+)").Replace("\\?", ".") + "$", RegexOptions.IgnoreCase);
+                m = new Regex("^" + Regex.Escape(Input).Replace("\\*", "(.*)").Replace("\\?", ".") + "$", RegexOptions.IgnoreCase);
             }
             return m;
         }

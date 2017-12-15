@@ -59,9 +59,11 @@ namespace Dewy
                 return Default;
             return Arguments[i];
         }
-        public string[] VarArgs()
+        public string[] VarArgs(bool NeverEmpty = false)
         {
-            return Arguments.Skip(1).ToArray();
+            string[] Ret = Arguments.Skip(1).ToArray();
+            if (NeverEmpty && Ret.Length == 0) return Util.Array("");
+            return Ret;
         }
         public string FullArg()
         {
