@@ -69,6 +69,97 @@ namespace Dewy
             }
             return null;
         }
+        public static List<string> AllEntries(string Dir)
+        {
+            List<string> All = new List<string>();
+            All = All.Concat(Directory.GetDirectories(Dir)).ToList();
+            All = All.Concat(Directory.GetFiles(Dir)).ToList();
+            return All;
+        }
+        public struct PathMatch
+        {
+            public string Path;
+            public string Match;
+
+        }
+        public static PathMatch GetPathMatch(string Input)
+        {
+            char[] Sep = "\\/".ToCharArray();
+            string[] Filn = Input.TrimEnd(Sep).Split(Sep);
+            string Pathc = string.Join("\\", Filn.Reverse().Skip(1).Reverse().ToArray());
+            string Mat = Filn.LastOrDefault();
+            return new PathMatch()
+            {
+                Path = Pathc,
+                Match = Mat
+            };
+        }
+        public static string[] Search(string Input, Parser a, int Level = 3, TerminalWritable Out = null)
+        {
+            PathMatch Pm = GetPathMatch(Input);
+            Regex Re = GenericRegex(Pm.Match, a);
+            DirectoryInfo Dir = new DirectoryInfo(Path.Combine(Environment.CurrentDirectory, Pm.Path));
+            HashSet<string> Results = new HashSet<string>();
+            Action<DirectoryInfo> Recur = null;
+            Recur = (d) =>
+            {
+                if (Out != null)
+                    Out.Write(d.Name);
+                try
+                {
+                    foreach (FileInfo Entry in d.GetFiles())
+                    {
+                        if (Re.IsMatch(Entry.Name))
+                            Results.Add(Entry.FullName);
+                    }
+                }
+                catch (Exception) { }
+                try
+                {
+                    foreach (DirectoryInfo Entry in d.GetDirectories())
+                    {
+                        if (Re.IsMatch(Entry.Name))
+                            Results.Add(Entry.FullName);
+                        Recur(Entry);
+                    }
+                }
+                catch (Exception) { }
+            };
+            Recur(Dir);
+            Out.Last("Done");
+            return Results.ToArray();
+        }
+        public static string[] FindAllRecur(string Input, Parser a)
+        {
+            PathMatch Pm = GetPathMatch(Input);
+            string Pathc = Pm.Path;
+            string Mat = Pm.Match;
+            string Dir = new DirectoryInfo(Path.Combine(Environment.CurrentDirectory, Pathc)).FullName;
+            Regex Re = GenericRegex(Mat, a);
+            List<string> Matched = new List<string>();
+            List<string> Final = new List<string>();
+
+            foreach (string F in AllEntries(Dir))
+            {
+                FileInfo fi = new FileInfo(F);
+                if (Re.IsMatch(fi.Name))
+                    Matched.Add(F);
+            }
+            Action<IEnumerable<string>> Recur = null;
+            Recur = (l) =>
+            {
+                foreach (string F in l)
+                {
+                    Final.Add(F);
+                    if (Directory.Exists(F))
+                    {
+                        Recur(AllEntries(F));
+                    }
+                }
+            };
+            Recur(Matched);
+            return Final.ToArray();
+        }
         public static FileInfo FindFile(string Input)
         {
             string In = Input.ToLower();
@@ -152,9 +243,12 @@ namespace Dewy
     }
     static class Extension
     {
-        public static string Format(this string Str, params object[] Obj)
+        public static void Each<T>(this IEnumerable<T> Arr, Action<T> Act)
         {
-            return string.Format(Str, Obj);
+            foreach(T Item in Arr)
+            {
+                Act.Invoke(Item);
+            }
         }
     }
 }

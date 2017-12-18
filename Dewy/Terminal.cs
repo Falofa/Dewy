@@ -34,16 +34,9 @@ namespace Dewy
         {
             ColorRegex = new Regex("(?<!\\\\)\\$[a-fr\\d]", Program.GeneralUseRegex);
             Console.Title = Program.Name;
-            Console.BufferHeight = Console.WindowHeight;
+            Console.BufferHeight = 800;
             Fingerprint();
             ResetColors();
-        }
-        public static void BufferUpdate()
-        {
-            if (Console.CursorTop >= Console.BufferHeight - 1 && Console.BufferHeight < 600)
-            {
-                Console.BufferHeight += 1;
-            }
         }
 
         public static ConsoleColor DefaultForeground = ConsoleColor.White;
@@ -95,23 +88,22 @@ namespace Dewy
             {
                 Console.Write(c, Args);
                 if (i++ > 0) Console.WriteLine();
-                BufferUpdate();
             }
         }
 
         public static void Fingerprint()
         {
             string[] Mark = new string[] {
-                @"  $a╔$a══════════════════════════════$a╗",
-                @"  $a║$c  _____                       $a║",
-                @"  $a║$c |  __ \                      $a║",
-                @"  $a║$c | |  | | _____      ___   _  $a║",
-                @"  $a║$c | |  | |/ _ \ \ /\ / / | | | $a║",
-                @"  $a║$c | |__| |  __/\ V  V /| |_| | $a║",
-                @"  $a║$c |_____/ \___| \_/\_/  \__, | $a║",
-                @"  $a║$c                        __/ | $a║",
-                @"  $a║$c  $fDeveloped by Falofa  $c|___/  $a║",
-                @"  $a╚$a══════════════════════════════$a╝"
+                @"  $f╔$f══════════════════════════════$f╗",
+                @"  $f║$c  _____                       $f║",
+                @"  $f║$c |  __ \                      $f║",
+                @"  $f║$c | |  | | _____      ___   _  $f║",
+                @"  $f║$c | |  | |/ _ \ \ /\ / / | | | $f║",
+                @"  $f║$c | |__| |  __/\ V  V /| |_| | $f║",
+                @"  $f║$c |_____/ \___| \_/\_/  \__, | $f║",
+                @"  $f║$c                        __/ | $f║",
+                @"  $f║$c  $aDeveloped by Falofa  $c|___/  $f║",
+                @"  $f╚$f══════════════════════════════$f╝"
             };
             WriteLine();
             foreach (string Line in Mark)
@@ -182,5 +174,70 @@ namespace Dewy
         {
             Console.Clear();
         }
+        public static CursorPosition GetPos()
+        {
+            return new CursorPosition()
+            {
+                x = Console.CursorLeft,
+                y = Console.CursorTop
+            };
+        }
+        public static void SetPos(CursorPosition Pos)
+        {
+            Console.CursorLeft = Pos.x;
+            Console.CursorTop = Pos.y;
+        }
+        public static TerminalWritable Writable(string Message, ConsoleColor C)
+        {
+            CWrite(Message);
+            TerminalWritable R = new TerminalWritable(Console.BufferWidth - Console.CursorLeft, C);
+            WriteLine();
+            return R;
+        }
+    }
+    public struct CursorPosition
+    {
+        public int x;
+        public int y;
+    }
+    public class TerminalWritable
+    {
+        public int Len = 0;
+        public ConsoleColor C = ConsoleColor.White;
+        public CursorPosition Pos;
+        public bool PreventSpam = false;
+        public int MinDelay = 100;
+        public int Time = 0;
+        public TerminalWritable(int Len, ConsoleColor C)
+        {
+            this.Len = Len;
+            this.C = C;
+            this.Pos = Terminal.GetPos();
+        }
+        public void Last(string Format, params object[] Objects)
+        {
+            Time = 0;
+            Write(Format, Objects);
+        }
+        public void Write(string Format, params object[] Objects)
+        {
+            if (PreventSpam && Environment.TickCount < Time + MinDelay)
+                return;
+            Time = Environment.TickCount;
+            string ToWrite = string.Format(Format, Objects);
+            if (ToWrite.Length > Len)
+                ToWrite = ToWrite.Substring(0, Len);
+            CursorPosition Back = Terminal.GetPos();
+            ConsoleColor BackC = Console.ForegroundColor;
+            Terminal.SetForeColor(C);
+            Terminal.SetPos(Pos);
+            Terminal.Write("{0}", ToWrite.PadRight(Len));
+            Terminal.SetForeColor(BackC);
+            Terminal.SetPos(Back);
+        }
+    }
+    public class ConsoleCancel : Exception
+    {
+
     }
 }

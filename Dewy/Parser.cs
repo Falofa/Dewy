@@ -17,6 +17,26 @@ namespace Dewy
         List<string> sRaw = new List<string>();
         public Dictionary<string, string> Parameters = new Dictionary<string, string>();
         public Dictionary<string, bool> Switches = new Dictionary<string, bool>();
+        public int IntParam(string P, int Default = 0)
+        {
+            string s = Param(P);
+            int r = 0;
+            if(int.TryParse(s, out r))
+                return r;
+            return Default;
+        }
+        public int Int(int P, int Default = 0)
+        {
+            string s = Get(P);
+            int r = 0;
+            if (int.TryParse(s, out r))
+                return r;
+            return Default;
+        }
+        public void Return(object Ret)
+        {
+            Program.Return = Ret;
+        }
         public void AddParameter(string Name, string Default = "")
         {
             Parameters[Name.ToLower()] = Default;

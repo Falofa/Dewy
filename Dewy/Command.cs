@@ -12,21 +12,35 @@ namespace Dewy
         public Dictionary<string, bool> Switches = new Dictionary<string, bool>();
         public Dictionary<string, string> HParameters = new Dictionary<string, string>();
         public Dictionary<string, string> HSwitches = new Dictionary<string, string>();
+        public List<Argument> Args = new List<Argument>();
         public List<string> Aliases = new List<string>();
         public Action<Parser> Callback = null;
+        public bool Debug = false;
         public string Description = "Nothing here";
         public bool ParsePR = true;
         public bool ParseSW = true;
 
-        public Command(string Name)
+        public Command(string Name, bool Debug = false)
         {
             this.Name = Name;
+            this.Debug = Debug;
             Callback = (a) => Terminal.WriteLine("Not implemented!");
             Program.Cmds.Add(this);
         }
-        public static Command Make(string Name)
+        public static Command Make(string Name, bool Debug = false)
         {
-            return new Command(Name);
+            return new Command(Name, Debug);
+        }
+        public Command AddArg(string Name, string Description = null, bool Required = false, bool Vararg = false)
+        {
+            Args.Add(new Argument
+            {
+                Name = Name,
+                Description = Description,
+                Required = Required,
+                Vararg = Vararg
+            });
+            return this;
         }
         public Command Describe(string Text)
         {
@@ -145,6 +159,13 @@ namespace Dewy
             }
             return this;
         }
+    }
+    class Argument
+    {
+        public string Name = "";
+        public string Description = "";
+        public bool Required = false;
+        public bool Vararg = false;
     }
     class CommandPreset
     {

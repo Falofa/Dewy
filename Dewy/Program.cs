@@ -12,19 +12,41 @@ namespace Dewy
         public const RegexOptions GeneralUseRegex = RegexOptions.IgnoreCase | RegexOptions.Compiled;
         public const string Name = "Dewy";
         public static List<Command> Cmds = new List<Command>();
+        public static Thread Current = null;
+        public static Object Return = null;
         static void Main(string[] args)
         {
             Terminal.Setup();
             Commands.Load();
+            ConsoleCancelEventHandler BlockCtrlC = delegate (object o, ConsoleCancelEventArgs e)
+            {
+                if (Current != null && Current.IsAlive)
+                    Current.Abort();
+                e.Cancel = true;
+            };
+            Console.CancelKeyPress += BlockCtrlC;
             while (true)
             {
                 Terminal.ResetColors();
                 string Input = Terminal.PrettyInput();
-                RunCommand(Input);
+                bool Ran = false;
+                while (!Ran)
+                {
+                    
+                    if (Input == null)
+                    {
+                        Input = Terminal.ReadLine();
+                        continue;
+                    }
+                    if (Input != string.Empty)
+                        RunCommand(Input);
+                    Ran = true;
+                }
             }
         }
-        public static void RunCommand(string C)
+        public static object RunCommand(string C)
         {
+            Return = null;
             Parser p = new Parser();
             p.Parse(C);
             string Cmd = p.Get(0).ToLower();
@@ -32,14 +54,24 @@ namespace Dewy
             if (ToRun == null)
             {
                 Terminal.CWriteLine("$cCommand not found");
-                return;
+                return null;
             }
             p = new Parser();
             p.Switches = new Dictionary<string, bool>(ToRun.Switches);
             p.Parameters = new Dictionary<string, string>(ToRun.Parameters);
             p.Parse(C);
-            ToRun.Callback.Invoke(p);
-            p.Get(0);
+
+
+            Current = new Thread(() => { ToRun.Callback.Invoke(p); });
+
+            Console.CursorVisible = false;
+
+            Current.Start();
+            Current.Join();
+
+            Console.CursorVisible = true;
+
+            return Return;
         }
         public static Command FindCommand(string Name)
         {
@@ -55,6 +87,23 @@ namespace Dewy
         public static void Help(Command C)
         {
             Terminal.CWriteLine("$e{0} - $8{1}", C.Name.ToUpper(), C.Description);
+            if (C.Args.Count > 0)
+            {
+                Terminal.CWriteLine("\n$aSyntax:");
+                Terminal.CWrite("$e{0} ", C.Name.ToUpper());
+                foreach(Argument Arg in C.Args)
+                {
+                    string Format = "$8[{0}{1}] ";
+                    if (Arg.Required)
+                        Format = "$8({0}{1}) ";
+                    Terminal.CWrite(Format, Arg.Name.ToUpper(), Arg.Vararg ? "..." : "");
+                }
+                Terminal.WriteLine("\n");
+                foreach (Argument Arg in C.Args)
+                {
+                    Terminal.CWriteLine("$e{0} $8- {1}", Arg.Name.ToUpper(), Arg.Description);
+                }
+            }
             if (C.Parameters.Count > 0)
             {
                 Terminal.CWriteLine("\n$aParameters:");
