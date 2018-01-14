@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Windows.Forms;
+using System.IO;
 
 namespace Dewy
 {
@@ -11,11 +13,14 @@ namespace Dewy
     {
         public const RegexOptions GeneralUseRegex = RegexOptions.IgnoreCase | RegexOptions.Compiled;
         public const string Name = "Dewy";
+        public static FileInfo Executable = null;
         public static List<Command> Cmds = new List<Command>();
         public static Thread Current = null;
-        public static Object Return = null;
+        public static Parser CurrentParser = null;
+        public static bool Debug = false;
         static void Main(string[] args)
         {
+            Executable = new FileInfo(Environment.GetCommandLineArgs()[0]);
             Terminal.Setup();
             Commands.Load();
             ConsoleCancelEventHandler BlockCtrlC = delegate (object o, ConsoleCancelEventArgs e)
@@ -23,6 +28,7 @@ namespace Dewy
                 if (Current != null && Current.IsAlive)
                     Current.Abort();
                 e.Cancel = true;
+                CurrentParser.Exit = true;
             };
             Console.CancelKeyPress += BlockCtrlC;
             while (true)
@@ -46,9 +52,8 @@ namespace Dewy
         }
         public static object RunCommand(string C)
         {
-            Return = null;
-            Parser p = new Parser();
-            p.Parse(C);
+            Parser p = new Parser(false);
+            p.ParseRegex(C);
             string Cmd = p.Get(0).ToLower();
             Command ToRun = FindCommand(Cmd);
             if (ToRun == null)
@@ -56,13 +61,20 @@ namespace Dewy
                 Terminal.CWriteLine("$cCommand not found");
                 return null;
             }
-            p = new Parser();
-            p.Switches = new Dictionary<string, bool>(ToRun.Switches);
-            p.Parameters = new Dictionary<string, string>(ToRun.Parameters);
-            p.Parse(C);
+            CurrentParser = new Parser();
+            CurrentParser.Switches = new Dictionary<string, bool>(ToRun.Switches);
+            CurrentParser.Parameters = new Dictionary<string, string>(ToRun.Parameters);
+            CurrentParser.ParseRegex(C);
 
+            CurrentParser.StartCapture();
 
-            Current = new Thread(() => { ToRun.Callback.Invoke(p); });
+            if (CurrentParser.Halt)
+            {
+                CurrentParser.StopCapture();
+                return null;
+            }
+
+            Current = new Thread(() => { ToRun.Callback.Invoke(CurrentParser); });
 
             Console.CursorVisible = false;
 
@@ -71,7 +83,17 @@ namespace Dewy
 
             Console.CursorVisible = true;
 
-            return Return;
+            ToRun.Cancel.Invoke();
+
+            CurrentParser.StopCapture();
+            Terminal.Reset();
+
+            /*if (p.ReturnType != null)
+            {
+                Terminal.CWriteLine("$e> $e{0}", p.ReturnObject);
+            }*/
+
+            return p.ReturnObject;
         }
         public static Command FindCommand(string Name)
         {
@@ -120,22 +142,38 @@ namespace Dewy
                     Terminal.CWriteLine("$e/{0} $8{1}", p.Key, C.HSwitches[p.Key]);
                 }
             }
+            if (C.ExtraInfo.Length > 0)
+            {
+                Terminal.WriteLine();
+                Terminal.CWrite(C.ExtraInfo);
+                Terminal.WriteLine();
+            }
             if (C.Aliases.Count > 0)
                 Terminal.CWriteLine("\n$fAlso known as: $e{0}", Util.ArrayToStr(C.Aliases.Select(o => o.ToUpper()), ", "));
+        }
+        public static void SmallHelp(Command C, bool Force = false)
+        {
+            string Color = "$e";
+            if (C.Debug)
+            {
+                if (!Program.Debug && !Force) return;
+                Color = "$d";
+            }
+            if (C.Aliases.Count > 0)
+            {
+                string Aliases = Util.ArrayToStr(C.Aliases.Select(o => o.ToUpper()), ", ");
+                Terminal.CWriteLine(Color + "{0}, {1} - $8{2}", C.Name.ToUpper(), Aliases, C.Description);
+            }
+            else
+            {
+                Terminal.CWriteLine(Color + "{0} - $8{1}", C.Name.ToUpper(), C.Description);
+            }
         }
         public static void HelpAll()
         {
             foreach(Command C in Cmds)
             {
-                if (C.Aliases.Count > 0)
-                {
-                    string Aliases = Util.ArrayToStr(C.Aliases.Select(o => o.ToUpper()), ", ");
-                    Terminal.CWriteLine("$e{0}, {1} - $8{2}", C.Name.ToUpper(), Aliases, C.Description);
-                }
-                else
-                {
-                    Terminal.CWriteLine("$e{0} - $8{1}", C.Name.ToUpper(), C.Description);
-                }
+                SmallHelp(C);
             }
         }
     }

@@ -4,12 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
+using System.Threading;
 
 namespace Dewy
 {
     class Terminal
     {
         public static Regex ColorRegex = null;
+        public static List<TextWriter> Captures = new List<TextWriter>();
         public static Dictionary<char, ConsoleColor> Colors = new Dictionary<char, ConsoleColor>
         {
             { '0', ConsoleColor.Black },
@@ -35,6 +37,7 @@ namespace Dewy
             ColorRegex = new Regex("(?<!\\\\)\\$[a-fr\\d]", Program.GeneralUseRegex);
             Console.Title = Program.Name;
             Console.BufferHeight = 800;
+            Console.CursorSize = 1;
             Fingerprint();
             ResetColors();
         }
@@ -72,6 +75,11 @@ namespace Dewy
             Console.BackgroundColor = DefaultBackground;
             Console.ForegroundColor = DefaultForeground;
         }
+        public static void Reset()
+        {
+            ResetColors();
+            Terminal.Hide = false;
+        }
 
         public static bool Hide = false;
         public static bool CanWrite()
@@ -80,14 +88,27 @@ namespace Dewy
             return true;
         }
 
+        public static void RegisterWriter(TextWriter Tw)
+        {
+            Captures.Add(Tw);
+        }
+
+        public static void UnregisterWriter(TextWriter Tw)
+        {
+            Captures.Remove(Tw);
+        }
+
         public static void iWrite(string Format = "", params object[] Args)
         {
             if (!CanWrite()) return;
             int i = 0;
-            foreach (string c in Format.Split('\n'))
+            foreach (string ToWrite in Format.Split('\n'))
             {
-                Console.Write(c, Args);
-                if (i++ > 0) Console.WriteLine();
+                string CLineBreak = ((i   > 0) ? "\n" : "");
+                string FLineBreak = ((i++ > 0) ? "\r\n" : "");
+                Console.Write(ToWrite + CLineBreak, Args);
+                foreach (TextWriter Writer in Captures)
+                    Writer.Write(ToWrite + FLineBreak, Args);
             }
         }
 
@@ -154,9 +175,9 @@ namespace Dewy
         {
             return Console.ReadLine();
         }
-        public static ConsoleKeyInfo ReadKey()
+        public static ConsoleKeyInfo ReadKey(bool Hide = false)
         {
-            return Console.ReadKey();
+            return Console.ReadKey(Hide);
         }
         public static void Wait()
         {
@@ -184,60 +205,12 @@ namespace Dewy
         }
         public static void SetPos(CursorPosition Pos)
         {
-            Console.CursorLeft = Pos.x;
-            Console.CursorTop = Pos.y;
-        }
-        public static TerminalWritable Writable(string Message, ConsoleColor C)
-        {
-            CWrite(Message);
-            TerminalWritable R = new TerminalWritable(Console.BufferWidth - Console.CursorLeft, C);
-            WriteLine();
-            return R;
+            Console.SetCursorPosition(Pos.x, Pos.y);
         }
     }
     public struct CursorPosition
     {
         public int x;
         public int y;
-    }
-    public class TerminalWritable
-    {
-        public int Len = 0;
-        public ConsoleColor C = ConsoleColor.White;
-        public CursorPosition Pos;
-        public bool PreventSpam = false;
-        public int MinDelay = 100;
-        public int Time = 0;
-        public TerminalWritable(int Len, ConsoleColor C)
-        {
-            this.Len = Len;
-            this.C = C;
-            this.Pos = Terminal.GetPos();
-        }
-        public void Last(string Format, params object[] Objects)
-        {
-            Time = 0;
-            Write(Format, Objects);
-        }
-        public void Write(string Format, params object[] Objects)
-        {
-            if (PreventSpam && Environment.TickCount < Time + MinDelay)
-                return;
-            Time = Environment.TickCount;
-            string ToWrite = string.Format(Format, Objects);
-            if (ToWrite.Length > Len)
-                ToWrite = ToWrite.Substring(0, Len);
-            CursorPosition Back = Terminal.GetPos();
-            ConsoleColor BackC = Console.ForegroundColor;
-            Terminal.SetForeColor(C);
-            Terminal.SetPos(Pos);
-            Terminal.Write("{0}", ToWrite.PadRight(Len));
-            Terminal.SetForeColor(BackC);
-            Terminal.SetPos(Back);
-        }
-    }
-    public class ConsoleCancel : Exception
-    {
-
     }
 }

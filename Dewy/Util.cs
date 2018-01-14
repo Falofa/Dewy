@@ -6,6 +6,11 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Security;
 using System.Security.Principal;
+using System.Threading;
+using System.Net;
+using System.Web;
+using System.Security.Cryptography;
+using System.Windows.Forms;
 
 namespace Dewy
 {
@@ -30,6 +35,21 @@ namespace Dewy
             {
                 return Identity.Name;
             }
+        }
+        public static string Sor(int i)
+        {
+            return i == 1 ? "" : "s";
+        }
+        public static string GetAlphabet(string Reg)
+        {
+            string s = new string(new char[256].Select((t, i) => (char)i).ToArray());
+            Regex Regx = new Regex(string.Format("[{0}]+", Reg));
+            string Result = "";
+            foreach (Match m in Regx.Matches(s))
+            {
+                Result += m.Value;
+            }
+            return Result;
         }
         public static List<T> List<T>(params T[] List)
         {
@@ -69,6 +89,19 @@ namespace Dewy
             }
             return null;
         }
+        public static string EnumName(Type EnumType, int Value)
+        {
+            List<string> All = new List<string>();
+            foreach (var t in Enum.GetValues(EnumType))
+            {
+                int Bit = (int)t;
+                if (Bit == (Bit & Value))
+                    All.Add(Enum.GetName(EnumType, t));
+            };
+            if (All.Count == 0)
+                return Enum.GetName(EnumType, Value);
+            return string.Join(" ", All.ToArray());
+        }
         public static List<string> AllEntries(string Dir)
         {
             List<string> All = new List<string>();
@@ -94,7 +127,7 @@ namespace Dewy
                 Match = Mat
             };
         }
-        public static string[] Search(string Input, Parser a, int Level = 3, TerminalWritable Out = null)
+        public static string[] Search(string Input, Parser a, int Level = 3)
         {
             PathMatch Pm = GetPathMatch(Input);
             Regex Re = GenericRegex(Pm.Match, a);
@@ -103,14 +136,15 @@ namespace Dewy
             Action<DirectoryInfo> Recur = null;
             Recur = (d) =>
             {
-                if (Out != null)
-                    Out.Write(d.Name);
                 try
                 {
                     foreach (FileInfo Entry in d.GetFiles())
                     {
                         if (Re.IsMatch(Entry.Name))
+                        {
                             Results.Add(Entry.FullName);
+                            Terminal.CWriteLine("$a{0}", Entry.FullName);
+                        }
                     }
                 }
                 catch (Exception) { }
@@ -119,14 +153,16 @@ namespace Dewy
                     foreach (DirectoryInfo Entry in d.GetDirectories())
                     {
                         if (Re.IsMatch(Entry.Name))
+                        {
                             Results.Add(Entry.FullName);
+                            Terminal.CWriteLine("$a{0}", Entry.FullName);
+                        }
                         Recur(Entry);
                     }
                 }
                 catch (Exception) { }
             };
             Recur(Dir);
-            Out.Last("Done");
             return Results.ToArray();
         }
         public static string[] FindAllRecur(string Input, Parser a)
@@ -159,6 +195,159 @@ namespace Dewy
             };
             Recur(Matched);
             return Final.ToArray();
+        }
+        public static Regex FilenameMatch = new Regex("filename=\"([^\"]+)\"", Program.GeneralUseRegex);
+        public static Regex InvalidPath = new Regex(string.Format("[{0}{1}]+", Path.GetInvalidFileNameChars(), Path.GetInvalidPathChars()), Program.GeneralUseRegex);
+        public static int Rnd(int Min = 0, int Max = 256)
+        {
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            byte[] bytes = new byte[8];
+            rng.GetBytes(bytes);
+            return Math.Abs(Min + BitConverter.ToInt32(bytes, 0) % (Max - Min));
+        }
+        public static T PickRnd<T>(IEnumerable<T> Arr)
+        {
+            return Arr.OrderBy(o => Rnd(0, 1024)).FirstOrDefault();
+        }
+        public static string RandomString(int Len, string Alp = "abcdefghijklmnopqrstuvxwyz")
+        {
+            string r = "";
+            for (int i = 0; i < Len; i++)
+            {
+                r += Alp[Rnd(0, Alp.Length)];
+            }
+            return r;
+        }
+        public static int ParseInt(string Input, int Default = 0)
+        {
+            int Result = 0;
+            if (!int.TryParse(Input, out Result))
+                return Default;
+            return Result;
+        }
+        public static string Enabled(bool b, bool color = true)
+        {
+            if (color)
+                return b ? "$aEnabled" : "$cDisabled";
+            return b ? "Enabled" : "Disabled";
+        }
+        public static string FilAttr(FileInfo f, Dictionary<char, FileAttributes> FileA)
+        {
+            string Attr = "";
+            foreach (KeyValuePair<char, FileAttributes> Fa in FileA)
+            {
+                if ((f.Attributes & Fa.Value) == Fa.Value)
+                    Attr += Fa.Key;
+                else
+                    Attr += '-';
+            }
+            return Attr;
+        }
+        public static string DirAttr(DirectoryInfo f, Dictionary<char, FileAttributes> FileA)
+        {
+            string Attr = "";
+            foreach (KeyValuePair<char, FileAttributes> Fa in FileA)
+            {
+                if ((f.Attributes & Fa.Value) == Fa.Value)
+                    Attr += Fa.Key;
+                else
+                    Attr += '-';
+            }
+            return Attr;
+        }
+        public static List<WebClient> WorkingWC = new List<WebClient>();
+        public static bool DownloadFile(Uri DlUrl, string OutName = "")
+        {
+            bool Finished = false;
+            Terminal.CWriteLine("$c [DOWNLOAD]");
+            Terminal.CWriteLine("$fDownload Server: $a{0}", DlUrl.Host);
+
+            string Filename = null;
+            string MimeType = "";
+
+            try
+            {
+                WebRequest hwr = HttpWebRequest.Create(DlUrl);
+                hwr.Method = "HEAD";
+                WebResponse wr = hwr.GetResponse();
+                if (wr.Headers["Content-Disposition"] != null)
+                {
+                    Match m = FilenameMatch.Match(wr.Headers["Content-Disposition"]);
+                    if (m.Success)
+                        Filename = m.Groups[1].Value;
+                }
+                if (wr.Headers["Content-Type"] != null)
+                    MimeType = wr.Headers["Content-Type"];
+            } catch(Exception) { }
+            if (Filename != null)
+            {
+                Filename = InvalidPath.Replace(Filename, "_");
+                Terminal.CWriteLine("$fOnline Filename: $a{0}", Filename);
+            } else
+            {
+                try
+                {
+                    Filename = Path.GetFileName(DlUrl.LocalPath);
+                }
+                catch (Exception)
+                {
+                    Filename = RandomString(4);
+                };
+            }
+            if (MimeType.Length > 0)
+                Terminal.CWriteLine("$fMime: $a{0}", Mime.ParseMime(MimeType));
+            FileInfo FullFile = new FileInfo( OutName.Length == 0 ? Filename : OutName );
+            if (FullFile.Extension.Length > 1)
+            {
+                Filename = FullFile.Name;
+            } else
+            {
+                string Format = Mime.MimeToType(MimeType);
+                Filename = Path.GetFileNameWithoutExtension(Filename) + "." + Format;
+            }
+            FileInfo Output = new FileInfo(Path.Combine(Environment.CurrentDirectory, Filename));
+            Terminal.CWriteLine("$fOutput: $a{0}", Output.Name);
+            //return false;
+
+            WebClient wc = new WebClient();
+            WorkingWC.Add(wc);
+            wc.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36";
+            CursorPosition p = Terminal.GetPos();
+
+            int Begin = 0;
+            int BarSize = 25 + 3;
+            Action<int, float, bool> UpdateProgress = (b, speed, l) =>
+            {
+                int Progress = (int)Math.Round(((double)b / 100.0) * (BarSize - 3.0));
+                Terminal.SetPos(p);
+                Terminal.CWriteLine("$a[{0}] {1:0.00} kb/s", ">".PadLeft(Progress, '=').PadRight(BarSize - 3, '-'), speed);
+            };
+            AntiSpam Spam = new AntiSpam();
+            wc.DownloadProgressChanged += (o, e) =>
+            {
+                if (Spam.Ignore()) return;
+                float speed = (float)((double)e.BytesReceived / ((double)Environment.TickCount - (double)Begin));
+                UpdateProgress(e.ProgressPercentage, speed, false);
+            };
+            wc.DownloadFileCompleted += (o, e) =>
+            {
+                Finished = true;
+            };
+            UpdateProgress(0, 0, true);
+            Begin = Environment.TickCount;
+            wc.DownloadFileAsync(DlUrl, Output.FullName);
+            while(!Finished)
+            {
+                Thread.Sleep(250);
+                if (wc == null)
+                {
+                    return false;
+                }
+            }
+            Thread.Sleep(250);
+            UpdateProgress(100, 0, true);
+            Terminal.WriteLine();
+            return true;
         }
         public static FileInfo FindFile(string Input)
         {
@@ -226,8 +415,11 @@ namespace Dewy
             }
             return Result.ToArray();
         }
-        public static Regex GenericRegex(string Input, Parser a)
+        public static Regex GenericRegex(string Input, Parser a, bool Greedy = false)
         {
+            string Part = Greedy ? ".*" : "";
+            if (Greedy && Input.Trim('*') != Input && !a.Switch("r"))
+                Part = "";
             Regex m = null;
             if (a.Switch("r"))
             {
@@ -236,9 +428,15 @@ namespace Dewy
             else
             {
                 if (Input.Length == 0) return new Regex(".+");
-                m = new Regex("^" + Regex.Escape(Input).Replace("\\*", "(.*)").Replace("\\?", ".") + "$", RegexOptions.IgnoreCase);
+                m = new Regex("^" + Part + Regex.Escape(Input).Replace("\\*", "(.*)").Replace("\\?", ".") + Part + "$", RegexOptions.IgnoreCase);
             }
             return m;
+        }
+        public static string MakeRelative(string filePath, string referencePath)
+        {
+            var fileUri = new Uri(filePath);
+            var referenceUri = new Uri(referencePath);
+            return Uri.UnescapeDataString(referenceUri.MakeRelativeUri(fileUri).ToString());
         }
     }
     static class Extension
@@ -249,6 +447,21 @@ namespace Dewy
             {
                 Act.Invoke(Item);
             }
+        }
+    }
+    public class AntiSpam
+    {
+        public int Delay = 0;
+        public int Time = 0;
+        public AntiSpam(int Delay = 100)
+        {
+            this.Delay = Delay;
+        }
+        public bool Ignore()
+        {
+            if (Environment.TickCount < Time + Delay) return true;
+            Time = Environment.TickCount;
+            return false;
         }
     }
 }

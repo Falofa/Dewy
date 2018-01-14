@@ -15,11 +15,14 @@ namespace Dewy
         public List<Argument> Args = new List<Argument>();
         public List<string> Aliases = new List<string>();
         public Action<Parser> Callback = null;
+        public string ExtraInfo = "";
+        public Action Cancel = () => { };
         public bool Debug = false;
         public string Description = "Nothing here";
         public bool ParsePR = true;
         public bool ParseSW = true;
-
+        public bool Documented = false;
+        
         public Command(string Name, bool Debug = false)
         {
             this.Name = Name;
@@ -42,9 +45,23 @@ namespace Dewy
             });
             return this;
         }
+        public Command AddText(params string[] Texts)
+        {
+            foreach (string Text in Texts)
+            {
+                ExtraInfo += Text + "\n";
+            }
+            return this;
+        }
         public Command Describe(string Text)
         {
+            Documented = true;
             Description = Text.TrimEnd('.');
+            return this;
+        }
+        public Command Cleanup(Action Clean)
+        {
+            this.Cancel = Clean;
             return this;
         }
         public Command DescribeParam(string Key, string Text)
